@@ -11,23 +11,24 @@ app = Flask(__name__)
 
 @app.route('/pages')
 def get_all_pages():
-    pages = WikiPage.query.all()
+    pages = Session.query(WikiPage).all()
     result = {p.id: p.title for p in pages}
     return json.dumps(result)
 
 
 @app.route('/page', methods=['POST'])
-def new_page():
+def create_new_page():
     data = request.get_json(silent=True)
     if data is None:
         abort(401)
     try:
         page = WikiPage(title=data['title'])
         page_version = WikiPageVersion(wikipage=page, number=1, text=data['text'])
-
-        page.commit(silent=False)
-        page.current_version=page_version
-        page.commit(silent=False)
+        # FIXME: do it in one commit somehow
+        Session.add(page_version)
+        Session.commit()
+        page.current_version = page_version
+        Session.commit()
     except KeyError:
         abort(401)
     except IntegrityError:
@@ -40,7 +41,7 @@ def new_page():
 @app.route('/page/<string:title>', defaults={'id': None})
 def get_page_current_version(id, title):
     try:
-        page_query = WikiPage.query.options(joinedload(WikiPage.current_version))
+        page_query = Session.query(WikiPage).options(joinedload(WikiPage.current_version))
         if id is not None:
             page = page_query.filter_by(id=id).one()
         else:
@@ -53,7 +54,7 @@ def get_page_current_version(id, title):
 @app.route('/page/<int:id>/versions')
 def get_page_versions(id):
     try:
-        page_versions = WikiPageVersion.query.filter_by(
+        page_versions = Session.query(WikiPageVersion).filter_by(
             wikipage_id=id,
         ).all()
     except NoResultFound as e:
@@ -64,7 +65,7 @@ def get_page_versions(id):
 @app.route('/page/<int:id>/current_version')
 def get_page_current_version_id(id, version):
     try:
-        page = WikiPage.query.filter_by(id=id).one()
+        page = Session.query(WikiPage).filter_by(id=id).one()
     except NoResultFound:
         abort(404)
     return jsonify(id=page.id, current_version_id=page.current_version_id)
@@ -73,12 +74,12 @@ def get_page_current_version_id(id, version):
 @app.route('/page/<int:id>/current_version', methods=['POST'])
 def set_page_current_version(id, version):
     try:
-        page_version = WikiPageVersion.query.options(joinedload(WikiPageVersion.wikipage)).filter_by(
+        page_version = Session.query(WikiPageVersion).options(joinedload(WikiPageVersion.wikipage)).filter_by(
             wikipage_id=id,
             number=version
         ).one()
         page_version.wikipage.current_version = page_version
-        page_version.commit()
+        Session.commit()
     except NoResultFound:
         abort(404)
     return jsonify(result='OK')
@@ -87,7 +88,7 @@ def set_page_current_version(id, version):
 @app.route('/page/<int:id>/version/<int:version>')
 def get_page_version(id, version):
     try:
-        page_version = WikiPageVersion.query.options(joinedload(WikiPageVersion.wikipage)).filter_by(
+        page_version = Session.query(WikiPageVersion).options(joinedload(WikiPageVersion.wikipage)).filter_by(
             wikipage_id=id,
             number=version
         ).one()
@@ -110,7 +111,8 @@ def create_page_new_version(id):
     except NoResultFound:
         abort(404)
     new_page_version = WikiPageVersion(wikipage_id=id, text=data['text'], number=new_version_number)
-    new_page_version.commit()
+    Session.add(new_page_version)
+    Session.commit()
 
     return jsonify(result='OK', version=new_version_number)
 

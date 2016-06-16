@@ -1,5 +1,3 @@
-import json
-
 from sqlalchemy import create_engine, Text, Index
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.ext.declarative import declarative_base

@@ -1,10 +1,18 @@
 from flask import Flask, jsonify, abort, request, json
-from sqlalchemy import func
+from sqlalchemy import func, create_engine
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, scoped_session, sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 
-from sqldb import WikiPage, WikiPageVersion, Session
+from sqldb import WikiPage, WikiPageVersion
+
+import logging
+logger = logging.getLogger(__name__)
+
+from sqldb_config import config
+
+engine = create_engine('postgresql://{user}:{password}@{host}/{database}'.format(**config), echo=False)
+Session = scoped_session(sessionmaker(bind=engine, autocommit=False, autoflush=False))
 
 app = Flask(__name__)
 
@@ -108,13 +116,12 @@ def create_page_new_version(id):
                 .group_by(WikiPageVersion.wikipage_id)
                 .filter_by(wikipage_id=id).one()
         )[0] + 1
+        new_page_version = WikiPageVersion(wikipage_id=id, text=data['text'], number=new_version_number)
+        Session.add(new_page_version)
+        Session.commit()
+        return jsonify(result='OK', version=new_version_number)
     except NoResultFound:
         abort(404)
-    new_page_version = WikiPageVersion(wikipage_id=id, text=data['text'], number=new_version_number)
-    Session.add(new_page_version)
-    Session.commit()
-
-    return jsonify(result='OK', version=new_version_number)
 
 
 if __name__ == '__main__':

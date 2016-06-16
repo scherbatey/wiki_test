@@ -5,37 +5,11 @@ from sqlalchemy.schema import Column, ForeignKey
 from sqlalchemy.types import Integer, String, DateTime
 from sqlalchemy.orm import relationship
 
-from sqldb_config import config
 
-import logging
-logger = logging.getLogger(__name__)
-
-engine = create_engine('postgresql://{user}:{password}@{host}/{database}'.format(**config),
-                       echo=False)
-Session = scoped_session(sessionmaker(bind=engine,
-                                      autocommit=False,
-                                      autoflush=False))
-
-
-def _commit_model(model, silent=False):
-    Session.add(model)
-    try:
-        Session.commit()
-    except Exception as e:
-        logger.error("Error: ", e)
-        Session.rollback()
-        if not silent:
-            raise
-        return False
-    return True
+def init_db(engine):
+    Base.metadata.create_all(bind=engine)
 
 Base = declarative_base()
-Base.query = Session.query_property()
-Base.commit = _commit_model
-
-
-def init_db():
-    Base.metadata.create_all(bind=engine)
 
 
 class WikiPage(Base):

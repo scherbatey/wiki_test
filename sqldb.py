@@ -19,14 +19,14 @@ Session = scoped_session(sessionmaker(bind=engine,
                                       autoflush=False))
 
 
-def _commit_model(model, raise_exception=False):
+def _commit_model(model, silent=False):
     Session.add(model)
     try:
         Session.commit()
     except Exception as e:
         logger.error("Error: ", e)
         Session.rollback()
-        if raise_exception:
+        if not silent:
             raise
         return False
     return True

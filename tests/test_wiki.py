@@ -1,19 +1,13 @@
-import threading
-from concurrent.futures import ThreadPoolExecutor
-from functools import partial
 from unittest import TestCase
 
-import requests
+import views
 from sqlalchemy import create_engine
 from sqlalchemy.exc import ProgrammingError
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
-from sqldb import init_db, Base
+from application import db, app
 from tests.test_config import config
 
-from server import app, engine
-
-executor = ThreadPoolExecutor()
 
 class WikiServerTest(TestCase):
     @classmethod
@@ -27,19 +21,23 @@ class WikiServerTest(TestCase):
             pass
         cls.admin_session.execute("create database {database} owner {user}".format(**config))
 
-        cls.session = scoped_session(sessionmaker(bind=engine, autocommit=False, autoflush=False))
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://{user}:{password}@{host}/{database}'.format(**config)
+        app.app_context().push()
+        db.init_app(app)
 
-        Base.metadata.create_all(bind=engine)
-
-        executor.submit(app.run, port=9999)
 
     @classmethod
     def tearDownClass(cls):
-        executor.shutdown()
+        pass
+        # cls.admin_session.execute("drop database {database}".format(**config))
+
+    def setUp(self):
+        db.create_all()
 
     def tearDown(self):
-        self.session.execute("truncate table wikipage cascade")
+        db.drop_all()
 
     def test_get_pages(self):
-        r = requests.get('127.0.0.1:9999/pages')
+        test_app = app.test_client()
+        r = test_app.get('/pages')
         print(r)

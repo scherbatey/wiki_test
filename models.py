@@ -1,28 +1,24 @@
-from sqlalchemy import create_engine, Text, Index
-from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy import Text, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.schema import Column, ForeignKey
-from sqlalchemy.types import Integer, String, DateTime
+from sqlalchemy.types import Integer, String
 from sqlalchemy.orm import relationship
 
-
-def init_db(engine):
-    Base.metadata.create_all(bind=engine)
-
-Base = declarative_base()
+from application import db
 
 
-class WikiPage(Base):
+class WikiPage(db.Model):
     __tablename__ = 'wikipage'
 
     id = Column(Integer, primary_key=True)
 
     title = Column(String, index=True, unique=True, nullable=False)
-    current_version_id = Column(Integer, ForeignKey('wikipageversion.id'))
+    current_version_id = Column(Integer,
+                                ForeignKey('wikipageversion.id', name='kf_current_version', ondelete='SET NULL'))
     current_version = relationship('WikiPageVersion', foreign_keys=current_version_id)
 
 
-class WikiPageVersion(Base):
+class WikiPageVersion(db.Model):
     __tablename__ = 'wikipageversion'
     __table_args__ = (
         Index('page_version_index', 'wikipage_id', 'number', unique=True),
